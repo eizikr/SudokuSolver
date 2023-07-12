@@ -1,14 +1,18 @@
-from constants import BOARD, SIZE
+import threading
+from constants import BOARD, SIZE, SOLVED_BOARD
 import time
 
 
-class Solver:
-    def __init__(self) -> None:
+class Solver(threading.Thread):
+    def __init__(self, event) -> None:
+        self.event = event
         self.current_square = [0,0]
+  
+        threading.Thread.__init__(self)
     
+
     def run(self):
         self.backtracking(BOARD, 0, 0)
-
 
     def display(self,matrix):
         # Print the board
@@ -17,7 +21,7 @@ class Solver:
                 print(matrix[row][col], end = " ")  
             print()
 
-    def isSolve(self,matrix, row, col, num):
+    def isSolve(self, matrix, row, col, num):
         # Check columns
         for col_pos in range (9):
             if matrix[row][col_pos] == num:
@@ -39,7 +43,9 @@ class Solver:
         return True
 
     def backtracking(self,matrix, row, col):
-
+        if self.event.is_set():
+            print('The backtracking thread was stopped prematurely.')
+            exit(1)
         # If done with the matrix    
         if (row == SIZE -1 and col == SIZE):
             return True
@@ -64,7 +70,9 @@ class Solver:
 
                 if self.backtracking(matrix, row, col + 1) == True:
                     return True
+                
             time.sleep(0.018)
+            
             self.current_square = [row,col]
             matrix[row][col] = 0
 
