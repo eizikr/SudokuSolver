@@ -8,12 +8,13 @@ import pygame
 class Sudoku():
 
     def __init__(self) -> None:
-        self.event = Event()
-        self.solver = Solver(event=self.event)
+        self.solver_event = Event()
+        self.solver = Solver(event=self.solver_event)
+        self.board = PLAYER_BOARD
         self.guesses_dict = {}
 
         
-        self.solver.display(SOLVED_BOARD)
+        self.solver.print_board(PLAYER_BOARD)
 
         pygame.init()
         self.font = pygame.font.Font('freesansbold.ttf', int(SQUARE_SIZE / 2))
@@ -22,7 +23,10 @@ class Sudoku():
         self.bt_alg_running = False
         self.guessed_number = None
         self.marked_square = None
-
+        self.marked_idx = None
+        self.mistakes = 0
+        self.mistake_pos_y = (BOARDER_START_Y + BOARD_SIZE) + 40
+        self.mistake_pos_x = 40
 
     def drawBoardLines(self):
         # Draw lines
@@ -42,7 +46,7 @@ class Sudoku():
         for i in range(0,SIZE):
             for j in range(0,SIZE):
                 color = 'red' if self.isCurrentSquare(row=i, col=j) else 'black'
-                text = self.font.render(f"{BOARD[i][j] if self.bt_alg_running != 0 else '' if BOARD[i][j] == 0 else BOARD[i][j]}", True, color, 'white')
+                text = self.font.render(f"{self.board[i][j] if self.bt_alg_running != 0 else '' if self.board[i][j] == 0 else self.board[i][j]}", True, color, 'white')
                 self.screen.blit(text,(BOARDER_START_X + 5 + NUMBER_POS_START + SQUARE_SIZE * j ,BOARDER_START_Y + NUMBER_POS_START + SQUARE_SIZE * i))
 
     def run(self):
@@ -66,9 +70,19 @@ class Sudoku():
         if(self.marked_square != None):
                 pygame.draw.rect(self.screen, 'red',(self.marked_square[0], self.marked_square[1], SQUARE_SIZE + 2, SQUARE_SIZE + 2), 3)
 
-
-
+    def checkGuess(self):
         
+        if (not self.solver.isLegal(self.board, self.marked_idx[1], self.marked_idx[0], self.guesses_dict[self.marked_square])):
+            self.mistakes += 1
+        else:
+            self.board[self.marked_idx[1]][self.marked_idx[0]] = self.guesses_dict[self.marked_square]
+        del self.guesses_dict[self.marked_square]
+
+    def drawMistakes(self):
+        text = self.font.render(f"Mistakes: {self.mistakes}", True, "red", 'white')
+        self.screen.blit(text,(self.mistake_pos_x, self.mistake_pos_y))
+
+
     def gameLoop(self):
 
         running = True
@@ -77,7 +91,7 @@ class Sudoku():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                    self.event.set()
+                    self.solver_event.set()
 
                 
                 if event.type == pygame.KEYDOWN and not self.bt_alg_running:
@@ -85,35 +99,45 @@ class Sudoku():
                     keys = pygame.key.get_pressed()
                     
                     if keys[pygame.K_SPACE]:
+                        self.board = BOARD
                         self.bt_alg_running = True
                         self.guesses_dict.clear()
                         self.solver.start()
 
-                    if event.unicode.isnumeric():
+                    if event.unicode.isnumeric() and self.marked_square != None and BOARD[self.marked_idx[1]][self.marked_idx[0]] == 0:
                         number_pressed = int(event.unicode)
                         self.guesses_dict[self.marked_square] = number_pressed
 
                     if keys[pygame.K_BACKSPACE] and self.marked_square in self.guesses_dict:
                         del self.guesses_dict[self.marked_square]
                     
+                    if keys[pygame.K_RETURN] and self.marked_square in self.guesses_dict.keys():
+                        self.checkGuess()
+
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     clicked_point = pygame.mouse.get_pos()
                     self.marked_square = self.getClickerSquare(clicked_point[0], clicked_point[1])
-
+                    if self.marked_square is None:
+                        self.marked_idx = None
+                    else:
+                        self.marked_idx = (int(self.marked_square[0] / SQUARE_SIZE), int(self.marked_square[1] / SQUARE_SIZE))
 
             # Draw on screen
             self.screen.fill('white')
             self.drawBoardLines()
             self.drawAndUpdateNumbers()
             self.drawMarkedSquare()
-            
+            self.drawMistakes()
+
             for item in self.guesses_dict:
                 font = pygame.font.Font('freesansbold.ttf', int(SQUARE_SIZE / 4))
                 
                 text = font.render(f"{self.guesses_dict[item]}", True, (9,71,9), 'white')
                 self.screen.blit(text,(10 +item[0], 10 + item[1]))
-                
+
+            if self.mistakes == MAX_MISTAKES:
+                running = False
 
             pygame.display.flip()
         
